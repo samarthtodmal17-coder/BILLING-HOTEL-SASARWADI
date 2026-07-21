@@ -411,6 +411,25 @@
     transition:transform 0.15s;
   }
   .category-section-chevron.collapsed{transform:rotate(-90deg);}
+  /* Visible focus ring for custom keyboard-clickable elements (chips,
+     collapsible headers) that aren't native <button>s, so Tab navigation
+     is easy to see. */
+  .category-chip:focus-visible,
+  .order-chip:focus-visible,
+  .category-section-header:focus-visible,
+  #categoriesCardHeader:focus-visible,
+  .chip-close:focus-visible{
+    outline:2px solid var(--primary);
+    outline-offset:2px;
+  }
+  .subcategory-header{
+    font-weight:600;
+    font-size:12px;
+    color:var(--muted);
+    margin:10px 0 2px 4px;
+    text-transform:uppercase;
+    letter-spacing:0.3px;
+  }
   .edit-box .title{font-weight:700; margin-bottom:6px;}
   .variant-edit-row{
     display:flex;
@@ -590,11 +609,23 @@
       <h2>Add Items</h2>
       <input type="text" id="itemSearch" placeholder="Search menu items...">
       <div id="categoryChips" style="margin-top:10px;"></div>
+      <div id="subcategoryChips" style="margin-top:6px;"></div>
+      <label style="margin-top:10px;">Sort By</label>
+      <select id="billingSortMode">
+        <option value="">Default Order</option>
+        <option value="name-asc">Name (A–Z)</option>
+        <option value="name-desc">Name (Z–A)</option>
+        <option value="newest">Latest Added</option>
+        <option value="oldest">Oldest Added</option>
+        <option value="price-asc">Price (Low to High)</option>
+        <option value="price-desc">Price (High to Low)</option>
+      </select>
       <div id="menuPickerList" style="margin-top:10px; max-height:280px; overflow-y:auto;"></div>
     </div>
 
     <div class="card">
       <h2>Current Bill</h2>
+      <div id="currentBillTableLabel" class="muted" style="margin-bottom:8px; font-weight:600;"></div>
       <div id="cartList">
         <div class="empty-state">No items added yet.</div>
       </div>
@@ -611,7 +642,7 @@
             <option value="percent">Percent (%)</option>
           </select>
         </div>
-        <div>
+        <div id="paymentModeWrap">
           <label>Payment Mode</label>
           <select id="paymentMode">
             <option value="Cash">Cash</option>
@@ -622,10 +653,49 @@
         </div>
       </div>
 
+      <div class="row" style="margin-top:8px; align-items:center;">
+        <label style="display:flex; align-items:center; gap:6px; margin:0;">
+          <input type="checkbox" id="splitPaymentToggle" style="width:auto;">
+          <span>Split payment across modes</span>
+        </label>
+      </div>
+      <div id="splitPaymentRows" style="display:none; margin-top:8px;">
+        <div class="row">
+          <div>
+            <label>Mode 1</label>
+            <select id="splitMode1">
+              <option value="Cash">Cash</option>
+              <option value="Card">Card</option>
+              <option value="UPI">UPI</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label>Amount 1</label>
+            <input type="number" id="splitAmount1" min="0" step="0.01" value="0">
+          </div>
+          <div>
+            <label>Mode 2</label>
+            <select id="splitMode2">
+              <option value="Cash">Cash</option>
+              <option value="Card" selected>Card</option>
+              <option value="UPI">UPI</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label>Amount 2</label>
+            <input type="number" id="splitAmount2" min="0" step="0.01" value="0">
+          </div>
+        </div>
+        <p class="muted">Amount 1 + Amount 2 must add up to the bill total before you can save.</p>
+      </div>
+
       <div class="totals-box" id="totalsBox"></div>
 
       <div class="row" style="margin-top:14px;">
         <button class="btn secondary" id="btnClearBill">Clear Items</button>
+        <button class="btn secondary" id="btnPrintKOT">Print KOT</button>
         <button class="btn" id="btnSaveBill">Save &amp; Print Receipt</button>
       </div>
     </div>
@@ -658,6 +728,10 @@
           <label>Category</label>
           <select id="newItemCategory"></select>
         </div>
+        <div>
+          <label>Subcategory (optional)</label>
+          <select id="newItemSubcategory"></select>
+        </div>
       </div>
 
       <label class="checkbox-row" for="newItemHasVariants">
@@ -683,12 +757,29 @@
       <label>Tax Rate % (optional — leave blank to use the default tax rate)</label>
       <input type="number" id="newItemTaxPercent" min="0" step="0.01" placeholder="e.g. 18 for alcohol, blank for default">
 
+      <label>Kitchen Order Ticket (KOT)</label>
+      <select id="newItemKitchenMode">
+        <option value="">Use category's default</option>
+        <option value="on">Always send to kitchen</option>
+        <option value="off">Never send to kitchen</option>
+      </select>
+
       <button class="btn" id="btnAddItem" style="margin-top:12px;">Add Item</button>
     </div>
 
     <div class="card">
       <h2>Menu Items</h2>
-      <div id="menuManageList"></div>
+      <label>Sort By</label>
+      <select id="menuManageSortMode">
+        <option value="">Default Order</option>
+        <option value="name-asc">Name (A–Z)</option>
+        <option value="name-desc">Name (Z–A)</option>
+        <option value="newest">Latest Added</option>
+        <option value="oldest">Oldest Added</option>
+        <option value="price-asc">Price (Low to High)</option>
+        <option value="price-desc">Price (High to Low)</option>
+      </select>
+      <div id="menuManageList" style="margin-top:10px;"></div>
     </div>
   </section>
 
@@ -697,7 +788,7 @@
     <div class="card">
       <h2>Bill History</h2>
       <div class="row">
-        <input type="text" id="historySearch" placeholder="Search by bill no, table, or customer...">
+        <input type="text" id="historySearch" placeholder="Search by bill no, table, customer, or phone...">
         <input type="date" id="historyDateFilter" style="flex:0 0 170px;">
       </div>
       <button class="btn small secondary" id="btnClearDateFilter" style="margin-top:8px;">Show All Dates</button>
@@ -725,6 +816,22 @@
           <input type="date" id="dashToDate">
         </div>
       </div>
+      <button class="btn small secondary" id="btnExportDashboardCsv" style="margin-top:10px;">Export Summary (CSV)</button>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <h2>Low Stock Alert</h2>
+        <button class="btn small secondary" id="btnPrintStockReport" style="flex:0 0 auto;">Print Stock Report</button>
+      </div>
+      <p class="muted">Live stock levels for liquor, snacks, water, and cold drinks -- turn on "Stock" tracking per item in Menu &amp; Rates.</p>
+      <div id="dashLowStockBox"></div>
+    </div>
+
+    <div class="card">
+      <h2>Item-wise Units Sold by Category</h2>
+      <p class="muted">Uses the date range picked above -- every item sold in each category, with units sold, for easy stock/inventory planning.</p>
+      <div id="dashCategoryItemUnitsBox"></div>
     </div>
 
     <div class="card">
@@ -744,13 +851,35 @@
     </div>
 
     <div class="card">
-      <h2>Revenue by Category</h2>
+      <h2>Sales by Category</h2>
       <div id="dashCategoryBox"></div>
     </div>
 
     <div class="card">
+      <h2>Sales by Subcategory</h2>
+      <div id="dashSubcategoryBox"></div>
+    </div>
+
+    <div class="card">
       <h2>Best-Selling Items</h2>
-      <div id="dashBestSellersBox"></div>
+      <p class="muted">Every item sold in the selected range, not just the top few.</p>
+      <label>Sort By</label>
+      <select id="dashBestSellerSort">
+        <option value="qty">Units Sold (High to Low)</option>
+        <option value="revenue">Revenue (High to Low)</option>
+      </select>
+      <div id="dashBestSellersBox" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Peak Hours</h2>
+      <p class="muted">Which hours of the day bring the most business.</p>
+      <div id="dashHoursBox"></div>
+    </div>
+
+    <div class="card">
+      <h2>Day-of-Week Trends</h2>
+      <div id="dashWeekdayBox"></div>
     </div>
   </section>
 
@@ -805,6 +934,7 @@
       <button class="btn" id="btnSaveSettings" style="margin-top:14px;">Save Settings</button>
     </div>
 
+
     <div class="card">
       <h2>Data</h2>
       <p class="muted">All data is stored locally in this browser on this device only. Export a backup regularly, especially before clearing browser data or switching devices.</p>
@@ -855,7 +985,7 @@
      not a determined technical bypass.
      ============================================================ */
   var APP_ACCESS_PIN = "1717";
-  var LICENSED_TO = "HOTEL SASARWADI";
+  var LICENSED_TO = "hotel sasarwadi";
 
   var LOCK_STORAGE_KEY = "billingAppUnlocked_v1";
 
@@ -880,9 +1010,11 @@
       {id: "cat1", name: "Food"},
       {id: "cat2", name: "Drinks"}
     ],
+    subcategories: [],
     menuItems: [],
     openOrders: [],
-    bills: []
+    bills: [],
+    stockLog: []
   };
 
   // In-memory copy of all app data. Populated once loadData()'s promise
@@ -891,9 +1023,13 @@
   // anything is accidentally read before load finishes.
   var data = JSON.parse(JSON.stringify(defaultData));
   var activeCategoryFilter = null;
+  var activeSubcategoryFilter = null;
   var activeOrderId = null;
   var newItemVariants = []; // temp list while building a new variant item
   var editingItemId = null; // item currently being edited in Menu screen
+  var movingItemId = null; // item currently showing the category/subcategory "Move" editor
+  var menuManageSortMode = ""; // sort order for the Menu & Rates item list
+  var billingItemSortMode = ""; // sort order for the Billing screen's item picker
   var collapsedCategories = {}; // which category sections are collapsed in Menu & Rates (in-memory only)
   var editingVariants = null; // working copy of variants while editing
   var currentReceiptBill = null; // last bill shown in the receipt preview
@@ -915,9 +1051,11 @@
   function mergeWithDefaults(parsed){
     parsed.business = Object.assign({}, defaultData.business, parsed.business || {});
     parsed.categories = parsed.categories || defaultData.categories;
+    parsed.subcategories = parsed.subcategories || [];
     parsed.menuItems = parsed.menuItems || [];
     parsed.openOrders = parsed.openOrders || [];
     parsed.bills = parsed.bills || [];
+    parsed.stockLog = parsed.stockLog || [];
     return parsed;
   }
 
@@ -1049,6 +1187,33 @@
     t.textContent = msg;
     t.classList.add("show");
     setTimeout(function(){ t.classList.remove("show"); }, 2000);
+  }
+
+  // Makes a non-native clickable element (a <span> or <div> used as a
+  // chip/header instead of a real <button>) reachable by Tab and
+  // activatable with Enter or Space, same as a real button would be.
+  function makeKeyboardClickable(el){
+    el.tabIndex = 0;
+    el.setAttribute("role", "button");
+    el.addEventListener("keydown", function(e){
+      if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){
+        e.preventDefault();
+        el.click();
+      }
+    });
+  }
+
+  // Pressing Enter while focused in one of these text inputs clicks the
+  // given button, so the mouse is never required to submit a small form.
+  function submitOnEnter(inputId, buttonId){
+    var input = document.getElementById(inputId);
+    if(!input) return;
+    input.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){
+        e.preventDefault();
+        document.getElementById(buttonId).click();
+      }
+    });
   }
 
   function fmt(n){
@@ -1186,8 +1351,7 @@
     reader.onload = function(ev){
       try{
         var imported = JSON.parse(ev.target.result);
-        imported.openOrders = imported.openOrders || [];
-        data = imported;
+        data = mergeWithDefaults(imported); // fills in any fields missing from an older backup (e.g. subcategories)
         activeOrderId = null;
         saveData();
         renderHeader();
@@ -1218,6 +1382,75 @@
   });
 
   /* ================= MENU & RATES ================= */
+
+  // For sorting by price: variant items don't have one single price, so use
+  // their cheapest size as the representative price.
+  function getItemSortPrice(item){
+    if(item.variants && item.variants.length){
+      return Math.min.apply(null, item.variants.map(function(v){ return v.price; }));
+    }
+    return item.price || 0;
+  }
+
+  // Shared sort logic used by both the Menu & Rates item list and the
+  // Billing screen's item picker. "Newest/Oldest Added" uses each item's
+  // position in data.menuItems, since new items are always pushed to the
+  // end of that array -- so array order already reflects creation order,
+  // even for items that existed before this feature was added.
+  function sortMenuItemsBy(items, mode){
+    var sorted = items.slice();
+    switch(mode){
+      case "name-asc":
+        sorted.sort(function(a, b){ return a.name.localeCompare(b.name); });
+        break;
+      case "name-desc":
+        sorted.sort(function(a, b){ return b.name.localeCompare(a.name); });
+        break;
+      case "newest":
+        sorted.sort(function(a, b){ return data.menuItems.indexOf(b) - data.menuItems.indexOf(a); });
+        break;
+      case "oldest":
+        sorted.sort(function(a, b){ return data.menuItems.indexOf(a) - data.menuItems.indexOf(b); });
+        break;
+      case "price-asc":
+        sorted.sort(function(a, b){ return getItemSortPrice(a) - getItemSortPrice(b); });
+        break;
+      case "price-desc":
+        sorted.sort(function(a, b){ return getItemSortPrice(b) - getItemSortPrice(a); });
+        break;
+      default:
+        break; // "" -> keep default/natural order
+    }
+    return sorted;
+  }
+
+  // Fills the "Subcategory (optional)" select in the Add Item form based on
+  // whichever category is currently selected there.
+  function populateNewItemSubcategorySelect(){
+    var catId = document.getElementById("newItemCategory").value;
+    var subSel = document.getElementById("newItemSubcategory");
+    var prevVal = subSel.value;
+    subSel.innerHTML = "";
+    var noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "No subcategory";
+    subSel.appendChild(noneOpt);
+    data.subcategories.filter(function(s){ return s.categoryId === catId; }).forEach(function(s){
+      var opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      subSel.appendChild(opt);
+    });
+    if(prevVal) subSel.value = prevVal;
+  }
+
+  document.getElementById("newItemCategory").addEventListener("change", populateNewItemSubcategorySelect);
+
+  document.getElementById("menuManageSortMode").addEventListener("change", function(){
+    menuManageSortMode = this.value;
+    renderMenuScreen();
+  });
+
   function renderMenuScreen(){
     // category dropdown for add-item form
     var sel = document.getElementById("newItemCategory");
@@ -1230,6 +1463,7 @@
       sel.appendChild(opt);
     });
     if(prevVal) sel.value = prevVal;
+    populateNewItemSubcategorySelect();
 
     // category manage list
     document.getElementById("categoriesCountBadge").textContent =
@@ -1240,14 +1474,38 @@
       catList.innerHTML = '<div class="empty-state">No categories yet.</div>';
     }
     data.categories.forEach(function(c){
+      var wrap = document.createElement("div");
+      wrap.style.borderBottom = "1px solid var(--border)";
+      wrap.style.padding = "8px 0";
+
       var div = document.createElement("div");
       div.className = "flex-between";
-      div.style.padding = "6px 0";
-      div.innerHTML = '<span>' + escapeHtml(c.name) + '</span>';
+      var catKotOn = categorySendsToKitchen(c.id);
+      div.innerHTML = '<span style="font-weight:600;">' + escapeHtml(c.name) + '</span>' +
+        '<span class="muted" style="margin-left:8px; font-weight:400;">' + (catKotOn ? "KOT: On by default" : "KOT: Off by default") + '</span>';
+
+      var actionsWrap = document.createElement("div");
+      actionsWrap.style.display = "flex";
+      actionsWrap.style.gap = "6px";
+
+      var catKotBtn = document.createElement("button");
+      catKotBtn.className = "btn small secondary";
+      catKotBtn.textContent = catKotOn ? "Turn KOT Off for category" : "Turn KOT On for category";
+      catKotBtn.addEventListener("click", function(){
+        c.sendToKitchen = catKotOn ? false : true;
+        saveData();
+        renderMenuScreen();
+      });
+
       var delBtn = document.createElement("button");
       delBtn.className = "btn small danger";
       delBtn.textContent = "Delete";
       delBtn.addEventListener("click", function(){
+        var hasOwnSubcats = data.subcategories.some(function(s){ return s.categoryId === c.id; });
+        if(hasOwnSubcats){
+          showToast("Remove this category's subcategories first");
+          return;
+        }
         if(data.menuItems.some(function(i){ return i.categoryId === c.id; })){
           showToast("Remove or reassign items in this category first");
           return;
@@ -1256,8 +1514,72 @@
         saveData();
         renderMenuScreen();
       });
-      div.appendChild(delBtn);
-      catList.appendChild(div);
+      actionsWrap.appendChild(catKotBtn);
+      actionsWrap.appendChild(delBtn);
+      div.appendChild(actionsWrap);
+      wrap.appendChild(div);
+      var catKotHint = document.createElement("div");
+      catKotHint.className = "muted";
+      catKotHint.style.fontSize = "11px";
+      catKotHint.textContent = "Individual items in this category can still override this with their own KOT setting.";
+      wrap.appendChild(catKotHint);
+
+      // subcategories under this category
+      var subcats = data.subcategories.filter(function(s){ return s.categoryId === c.id; });
+      if(subcats.length){
+        var subList = document.createElement("div");
+        subList.style.marginLeft = "14px";
+        subList.style.marginTop = "6px";
+        subcats.forEach(function(s){
+          var subRow = document.createElement("div");
+          subRow.className = "flex-between";
+          subRow.style.padding = "3px 0";
+          subRow.innerHTML = '<span class="muted">↳ ' + escapeHtml(s.name) + '</span>';
+          var subDel = document.createElement("button");
+          subDel.className = "btn small danger";
+          subDel.textContent = "Delete";
+          subDel.addEventListener("click", function(){
+            if(data.menuItems.some(function(i){ return i.subcategoryId === s.id; })){
+              showToast("Remove or reassign items in this subcategory first");
+              return;
+            }
+            data.subcategories = data.subcategories.filter(function(x){ return x.id !== s.id; });
+            saveData();
+            renderMenuScreen();
+          });
+          subRow.appendChild(subDel);
+          subList.appendChild(subRow);
+        });
+        wrap.appendChild(subList);
+      }
+
+      // inline "add subcategory" mini-form, scoped to this category
+      var addRow = document.createElement("div");
+      addRow.className = "row";
+      addRow.style.marginTop = "6px";
+      addRow.style.marginLeft = "14px";
+      var subNameInput = document.createElement("input");
+      subNameInput.type = "text";
+      subNameInput.placeholder = "e.g. " + (c.name === "Drinks" ? "Cocktails, Beer" : "Starters, Main Course");
+      var addSubBtn = document.createElement("button");
+      addSubBtn.className = "btn small secondary";
+      addSubBtn.style.flex = "0 0 auto";
+      addSubBtn.textContent = "+ Add Subcategory";
+      addSubBtn.addEventListener("click", function(){
+        var subName = subNameInput.value.trim();
+        if(!subName){ showToast("Enter a subcategory name"); return; }
+        data.subcategories.push({id: uid("subcat"), name: subName, categoryId: c.id});
+        saveData();
+        renderMenuScreen();
+      });
+      subNameInput.addEventListener("keydown", function(e){
+        if(e.key === "Enter"){ e.preventDefault(); addSubBtn.click(); }
+      });
+      addRow.appendChild(subNameInput);
+      addRow.appendChild(addSubBtn);
+      wrap.appendChild(addRow);
+
+      catList.appendChild(wrap);
     });
 
     // menu items manage list -- grouped into one collapsible section per
@@ -1268,7 +1590,14 @@
       list.innerHTML = '<div class="empty-state">No menu items yet. Add your first item above.</div>';
     }
 
-    function buildCategorySection(sectionKey, title, items){
+    // directItems render first inside the section body (no sub-header);
+    // subGroups is an optional array of {key, title, items} rendered below
+    // them, each under its own smaller subcategory heading.
+    function buildCategorySection(sectionKey, title, directItems, subGroups){
+      subGroups = subGroups || [];
+      var totalCount = directItems.length + subGroups.reduce(function(sum, g){ return sum + g.items.length; }, 0);
+      if(totalCount === 0) return;
+
       var section = document.createElement("div");
       section.className = "category-section";
 
@@ -1280,7 +1609,7 @@
 
       var countBadge = document.createElement("span");
       countBadge.className = "count-badge";
-      countBadge.textContent = items.length + (items.length === 1 ? " item" : " items");
+      countBadge.textContent = totalCount + (totalCount === 1 ? " item" : " items");
 
       var titleWrap = document.createElement("span");
       titleWrap.appendChild(titleSpan);
@@ -1306,31 +1635,233 @@
         chevron.classList.toggle("collapsed", nowCollapsed);
         collapsedCategories[sectionKey] = nowCollapsed;
       });
+      makeKeyboardClickable(header);
 
-      items.forEach(function(item){
+      directItems.forEach(function(item){
         renderMenuItemRow(body, item);
       });
+
+      subGroups.forEach(function(g){
+        if(g.items.length === 0) return;
+        var subHeader = document.createElement("div");
+        subHeader.className = "subcategory-header";
+        subHeader.textContent = "↳ " + g.title + " (" + g.items.length + ")";
+        body.appendChild(subHeader);
+        g.items.forEach(function(item){
+          renderMenuItemRow(body, item);
+        });
+      });
+
       section.appendChild(body);
       list.appendChild(section);
     }
 
     data.categories.forEach(function(c){
-      var items = data.menuItems.filter(function(i){ return i.categoryId === c.id; });
-      if(items.length === 0) return;
-      buildCategorySection("cat_" + c.id, c.name, items);
+      var directItems = sortMenuItemsBy(data.menuItems.filter(function(i){
+        return i.categoryId === c.id && (!i.subcategoryId || !data.subcategories.some(function(s){ return s.id === i.subcategoryId; }));
+      }), menuManageSortMode);
+      var subGroups = data.subcategories.filter(function(s){ return s.categoryId === c.id; }).map(function(s){
+        return {
+          key: s.id,
+          title: s.name,
+          items: sortMenuItemsBy(data.menuItems.filter(function(i){ return i.subcategoryId === s.id; }), menuManageSortMode)
+        };
+      });
+      buildCategorySection("cat_" + c.id, c.name, directItems, subGroups);
     });
 
     // items without a valid category
-    var orphan = data.menuItems.filter(function(i){
+    var orphan = sortMenuItemsBy(data.menuItems.filter(function(i){
       return !data.categories.some(function(c){ return c.id === i.categoryId; });
-    });
+    }), menuManageSortMode);
     if(orphan.length){
       buildCategorySection("uncategorized", "Uncategorized", orphan);
     }
   }
 
+  // Cycles an item's KOT override through: follow category -> Always ->
+  // Never -> back to follow category. Kept as a shared helper since both
+  // the variant-item and simple-item rows use the same button/behavior.
+  function cycleItemKotMode(item){
+    if(item.sendToKitchen === undefined || item.sendToKitchen === null){
+      item.sendToKitchen = false;
+    } else if(item.sendToKitchen === false){
+      item.sendToKitchen = true;
+    } else {
+      delete item.sendToKitchen;
+    }
+  }
+
+  function itemKotButtonLabel(item){
+    if(item.sendToKitchen === true) return "KOT: Always";
+    if(item.sendToKitchen === false) return "KOT: Never";
+    return "KOT: Category default";
+  }
+
+  function itemKotStatusText(item){
+    return itemSendsToKitchen(item) ? "" : "Not sent to kitchen";
+  }
+
+  /* ================= STOCK TRACKING (liquor / snacks / water / cold drinks) =================
+     Deliberately scoped: kitchen dishes are never stock-tracked (recipes vary
+     too much to track sanely in a simple billing app). Owners flip "Stock"
+     on per item for packaged/countable goods only.
+
+     Stock is kept as a simple running balance (item.stockQty), in "bottles"
+     for liquor-type items or "units" for everything else. Liquor is sold by
+     the peg but purchased by the bottle, so item.stockConversion holds how
+     many sold units (pegs) make up one stock count (one bottle) -- e.g. 20.
+     Simple items (snacks/water/cold drinks) keep stockConversion at 1, so
+     one sale = one unit deducted directly, no conversion math needed.
+     This is a rough, practical model (not exact ml-level peg tracking) by
+     design, per the owner's choice to keep it simple. */
+  function toggleItemStock(item){
+    item.trackStock = !item.trackStock;
+    if(item.trackStock){
+      if(item.stockQty === undefined || item.stockQty === null) item.stockQty = 0;
+      if(!item.stockConversion) item.stockConversion = 1;
+      if(item.lowStockThreshold === undefined || item.lowStockThreshold === null) item.lowStockThreshold = 5;
+    }
+  }
+  function stockUnitLabel(item){
+    return (item.stockConversion && item.stockConversion > 1) ? "bottles" : "units";
+  }
+  function formatStockQty(n){
+    var r = Math.round((n || 0) * 100) / 100;
+    return Number.isInteger(r) ? String(r) : r.toFixed(2);
+  }
+  function isLowStock(item){
+    if(!item.trackStock) return false;
+    var qty = item.stockQty || 0;
+    var threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 0;
+    return qty <= threshold;
+  }
+  function promptAddStock(item){
+    var qtyStr = prompt('How much stock to add for "' + item.name + '"? (in ' + stockUnitLabel(item) + ')', "");
+    if(qtyStr === null) return;
+    var q = parseFloat(qtyStr);
+    if(isNaN(q) || q <= 0){ showToast("Enter a valid quantity"); return; }
+    item.stockQty = (item.stockQty || 0) + q;
+    data.stockLog.push({id: uid("stock"), itemId: item.id, itemName: item.name, qtyAdded: q, date: new Date().toISOString()});
+    saveData();
+    renderMenuScreen();
+    showToast("Stock updated: " + item.name);
+  }
+  function promptEditStockSettings(item){
+    var currentQty = prompt('Current stock count for "' + item.name + '" (correct this after a physical count)', formatStockQty(item.stockQty || 0));
+    if(currentQty === null) return;
+    var cq = parseFloat(currentQty);
+    if(isNaN(cq)){ showToast("Invalid stock quantity"); return; }
+    var conv = prompt('Pegs/units per bottle for "' + item.name + '" (leave as 1 if sold as whole units, e.g. snacks/water/cold drinks)', item.stockConversion || 1);
+    if(conv === null) return;
+    var cv = parseFloat(conv);
+    if(isNaN(cv) || cv <= 0){ showToast("Invalid conversion value"); return; }
+    var thresh = prompt('Low stock alert threshold for "' + item.name + '"', item.lowStockThreshold !== undefined ? item.lowStockThreshold : 5);
+    if(thresh === null) return;
+    var th = parseFloat(thresh);
+    if(isNaN(th) || th < 0){ showToast("Invalid threshold"); return; }
+    item.stockQty = cq;
+    item.stockConversion = cv;
+    item.lowStockThreshold = th;
+    saveData();
+    renderMenuScreen();
+    showToast("Stock settings updated");
+  }
+  // Called once when a new bill is created (not on edits, to avoid double-
+  // counting deductions against a bill that was already deducted once).
+  function deductStockForSale(cartItems){
+    (cartItems || []).forEach(function(c){
+      if(!c.itemId) return;
+      var menuItem = data.menuItems.find(function(m){ return m.id === c.itemId; });
+      if(!menuItem || !menuItem.trackStock) return;
+      var conversion = menuItem.stockConversion || 1;
+      menuItem.stockQty = (menuItem.stockQty || 0) - (c.qty / conversion);
+    });
+  }
+
   function renderMenuItemRow(list, item){
     var hasVariants = item.variants && item.variants.length > 0;
+
+    if(movingItemId === item.id){
+      // ---- Move mode: change this item's category/subcategory ----
+      var moveBox = document.createElement("div");
+      moveBox.className = "edit-box";
+      var moveTitle = document.createElement("div");
+      moveTitle.className = "title";
+      moveTitle.textContent = "Move: " + item.name;
+      moveBox.appendChild(moveTitle);
+
+      var moveLabel1 = document.createElement("label");
+      moveLabel1.textContent = "Category";
+      moveLabel1.style.margin = "6px 0 2px";
+      moveBox.appendChild(moveLabel1);
+
+      var catSelect = document.createElement("select");
+      data.categories.forEach(function(c){
+        var opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.name;
+        catSelect.appendChild(opt);
+      });
+      catSelect.value = item.categoryId;
+      moveBox.appendChild(catSelect);
+
+      var moveLabel2 = document.createElement("label");
+      moveLabel2.textContent = "Subcategory (optional)";
+      moveLabel2.style.margin = "8px 0 2px";
+      moveBox.appendChild(moveLabel2);
+
+      var subSelect = document.createElement("select");
+      function refreshMoveSubOptions(){
+        subSelect.innerHTML = "";
+        var noneOpt = document.createElement("option");
+        noneOpt.value = "";
+        noneOpt.textContent = "No subcategory";
+        subSelect.appendChild(noneOpt);
+        data.subcategories.filter(function(s){ return s.categoryId === catSelect.value; }).forEach(function(s){
+          var opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.name;
+          subSelect.appendChild(opt);
+        });
+      }
+      refreshMoveSubOptions();
+      if(item.subcategoryId) subSelect.value = item.subcategoryId;
+      catSelect.addEventListener("change", refreshMoveSubOptions);
+      moveBox.appendChild(subSelect);
+
+      var moveActionsRow = document.createElement("div");
+      moveActionsRow.style.marginTop = "10px";
+      moveActionsRow.style.display = "flex";
+      moveActionsRow.style.gap = "8px";
+
+      var moveSaveBtn = document.createElement("button");
+      moveSaveBtn.className = "btn small";
+      moveSaveBtn.textContent = "Save";
+      moveSaveBtn.addEventListener("click", function(){
+        item.categoryId = catSelect.value;
+        item.subcategoryId = subSelect.value || null;
+        movingItemId = null;
+        saveData();
+        renderMenuScreen();
+        showToast("Item moved");
+      });
+
+      var moveCancelBtn = document.createElement("button");
+      moveCancelBtn.className = "btn small secondary";
+      moveCancelBtn.textContent = "Cancel";
+      moveCancelBtn.addEventListener("click", function(){
+        movingItemId = null;
+        renderMenuScreen();
+      });
+
+      moveActionsRow.appendChild(moveSaveBtn);
+      moveActionsRow.appendChild(moveCancelBtn);
+      moveBox.appendChild(moveActionsRow);
+
+      list.appendChild(moveBox);
+      return;
+    }
 
     if(hasVariants && editingItemId === item.id){
       // ---- Edit mode for variant item ----
@@ -1474,6 +2005,14 @@
         showToast("Name updated");
       });
 
+      var moveBtn = document.createElement("button");
+      moveBtn.className = "btn small secondary";
+      moveBtn.textContent = "Move";
+      moveBtn.addEventListener("click", function(){
+        movingItemId = item.id;
+        renderMenuScreen();
+      });
+
       var editBtn = document.createElement("button");
       editBtn.className = "btn small secondary";
       editBtn.textContent = "Edit Sizes";
@@ -1513,9 +2052,20 @@
         }
       });
 
+      var kotBtn = document.createElement("button");
+      kotBtn.className = "btn small secondary";
+      kotBtn.textContent = itemKotButtonLabel(item);
+      kotBtn.addEventListener("click", function(){
+        cycleItemKotMode(item);
+        saveData();
+        renderMenuScreen();
+      });
+
       actions.appendChild(editNameBtn);
+      actions.appendChild(moveBtn);
       actions.appendChild(editBtn);
       actions.appendChild(editTaxBtn);
+      actions.appendChild(kotBtn);
       actions.appendChild(delBtn);
       topLine.appendChild(actions);
       row.appendChild(topLine);
@@ -1524,13 +2074,15 @@
       var sizesDiv = document.createElement("div");
       sizesDiv.className = "item-cat";
       sizesDiv.style.marginTop = "4px";
-      sizesDiv.textContent = item.variants.map(function(v){ return v.label + ": " + fmt(v.price); }).join("  ·  ") + "  ·  " + taxText;
+      var kotStatusText = itemKotStatusText(item);
+      sizesDiv.textContent = item.variants.map(function(v){ return v.label + ": " + fmt(v.price); }).join("  ·  ") + "  ·  " + taxText + (kotStatusText ? "  ·  " + kotStatusText : "");
       row.appendChild(sizesDiv);
     } else {
       var taxText2 = (item.taxPercent !== undefined && item.taxPercent !== null) ? (item.taxPercent + "% tax") : "default tax";
+      var kotStatusText2 = itemKotStatusText(item);
       row.innerHTML =
         '<div><div class="item-name">' + escapeHtml(item.name) + '</div>' +
-        '<div class="item-cat">' + fmt(item.price) + '  ·  ' + taxText2 + '</div></div>';
+        '<div class="item-cat">' + fmt(item.price) + '  ·  ' + taxText2 + (kotStatusText2 ? '  ·  ' + kotStatusText2 : '') + '</div></div>';
       var actions2 = document.createElement("div");
       actions2.style.display = "flex";
       actions2.style.gap = "6px";
@@ -1547,6 +2099,14 @@
         saveData();
         renderMenuScreen();
         showToast("Name updated");
+      });
+
+      var moveBtn2 = document.createElement("button");
+      moveBtn2.className = "btn small secondary";
+      moveBtn2.textContent = "Move";
+      moveBtn2.addEventListener("click", function(){
+        movingItemId = item.id;
+        renderMenuScreen();
       });
 
       var editPriceBtn = document.createElement("button");
@@ -1592,9 +2152,20 @@
         }
       });
 
+      var kotBtn2 = document.createElement("button");
+      kotBtn2.className = "btn small secondary";
+      kotBtn2.textContent = itemKotButtonLabel(item);
+      kotBtn2.addEventListener("click", function(){
+        cycleItemKotMode(item);
+        saveData();
+        renderMenuScreen();
+      });
+
       actions2.appendChild(editNameBtn2);
+      actions2.appendChild(moveBtn2);
       actions2.appendChild(editPriceBtn);
       actions2.appendChild(editTaxBtn2);
+      actions2.appendChild(kotBtn2);
       actions2.appendChild(delBtn2);
       row.appendChild(actions2);
     }
@@ -1611,6 +2182,7 @@
     input.value = "";
     renderMenuScreen();
   });
+  submitOnEnter("newCategoryName", "btnAddCategory");
 
   // Minimize/expand the whole Categories card, so it takes up less room
   // once your categories are already set up and you rarely need to edit them.
@@ -1620,6 +2192,7 @@
     document.getElementById("categoriesCardBody").style.display = categoriesCardCollapsed ? "none" : "block";
     document.getElementById("categoriesCardChevron").style.transform = categoriesCardCollapsed ? "rotate(-90deg)" : "rotate(0deg)";
   });
+  makeKeyboardClickable(document.getElementById("categoriesCardHeader"));
 
   document.getElementById("newItemHasVariants").addEventListener("change", function(){
     var checked = this.checked;
@@ -1661,16 +2234,23 @@
     document.getElementById("variantPriceInput").value = "";
     renderVariantRowsList();
   });
+  submitOnEnter("variantLabelInput", "btnAddVariantRow");
+  submitOnEnter("variantPriceInput", "btnAddVariantRow");
 
   document.getElementById("btnAddItem").addEventListener("click", function(){
     var name = document.getElementById("newItemName").value.trim();
     var categoryId = document.getElementById("newItemCategory").value;
+    var subcategoryId = document.getElementById("newItemSubcategory").value || null;
     var hasVariants = document.getElementById("newItemHasVariants").checked;
 
     if(!name){ showToast("Enter an item name"); return; }
     if(!categoryId){ showToast("Add a category first"); return; }
 
-    var newItem = {id: uid("item"), name: name, categoryId: categoryId};
+    var newItem = {id: uid("item"), name: name, categoryId: categoryId, subcategoryId: subcategoryId};
+    var kotMode = document.getElementById("newItemKitchenMode").value;
+    if(kotMode === "on") newItem.sendToKitchen = true;
+    else if(kotMode === "off") newItem.sendToKitchen = false;
+    // else leave sendToKitchen unset so it follows the category's setting
 
     if(hasVariants){
       if(newItemVariants.length === 0){ showToast("Add at least one size and rate"); return; }
@@ -1694,15 +2274,20 @@
     document.getElementById("newItemName").value = "";
     document.getElementById("newItemPrice").value = "";
     document.getElementById("newItemTaxPercent").value = "";
+    document.getElementById("newItemSubcategory").value = "";
     document.getElementById("newItemHasVariants").checked = false;
     document.getElementById("simplePriceWrap").style.display = "block";
     document.getElementById("variantBuilderWrap").style.display = "none";
+    document.getElementById("newItemKitchenMode").value = "";
     newItemVariants = [];
     renderVariantRowsList();
 
     renderMenuScreen();
     showToast("Item added");
   });
+  submitOnEnter("newItemName", "btnAddItem");
+  submitOnEnter("newItemPrice", "btnAddItem");
+  submitOnEnter("newItemTaxPercent", "btnAddItem");
 
   /* ================= RUNNING ORDERS (TABLES) ================= */
 
@@ -1713,6 +2298,7 @@
     var searchEl = document.getElementById("itemSearch");
     if(searchEl) searchEl.value = "";
     activeCategoryFilter = null;
+    activeSubcategoryFilter = null;
   }
 
   function ensureActiveOrder(){
@@ -1734,6 +2320,9 @@
       discountValue: 0,
       discountType: "amount",
       paymentMode: "Cash",
+      splitEnabled: false,
+      splitPayments: null,
+      kotSent: {},
       createdAt: new Date().toISOString()
     };
     data.openOrders.push(order);
@@ -1824,6 +2413,7 @@
       }
 
       chip.addEventListener("click", function(){ switchOrder(o.id); });
+      makeKeyboardClickable(chip);
 
       if(data.openOrders.length > 1 || o.items.length > 0){
         var closeBtn = document.createElement("span");
@@ -1834,6 +2424,16 @@
           if(o.items.length > 0 && !confirm("Discard this order (" + itemCount + " item(s))? This cannot be undone.")) return;
           discardOrder(o.id);
         });
+        closeBtn.addEventListener("keydown", function(e){
+          if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){
+            e.preventDefault();
+            e.stopPropagation();
+            closeBtn.click();
+          }
+        });
+        closeBtn.tabIndex = 0;
+        closeBtn.setAttribute("role", "button");
+        closeBtn.setAttribute("aria-label", "Close this order");
         chip.appendChild(closeBtn);
       }
 
@@ -1859,9 +2459,12 @@
     allChip.textContent = "All";
     allChip.addEventListener("click", function(){
       activeCategoryFilter = null;
+      activeSubcategoryFilter = null;
       renderCategoryChips();
+      renderSubcategoryChips();
       renderMenuPicker();
     });
+    makeKeyboardClickable(allChip);
     wrap.appendChild(allChip);
     data.categories.forEach(function(c){
       var chip = document.createElement("span");
@@ -1869,9 +2472,52 @@
       chip.textContent = c.name;
       chip.addEventListener("click", function(){
         activeCategoryFilter = c.id;
+        activeSubcategoryFilter = null;
         renderCategoryChips();
+        renderSubcategoryChips();
         renderMenuPicker();
       });
+      makeKeyboardClickable(chip);
+      wrap.appendChild(chip);
+    });
+  }
+
+  // A second row of chips for the currently selected category's
+  // subcategories. Hidden entirely when "All" categories is selected, or
+  // when the selected category has no subcategories of its own.
+  function renderSubcategoryChips(){
+    var wrap = document.getElementById("subcategoryChips");
+    wrap.innerHTML = "";
+    if(activeCategoryFilter === null){
+      wrap.style.display = "none";
+      return;
+    }
+    var subcats = data.subcategories.filter(function(s){ return s.categoryId === activeCategoryFilter; });
+    if(subcats.length === 0){
+      wrap.style.display = "none";
+      return;
+    }
+    wrap.style.display = "block";
+    var allChip = document.createElement("span");
+    allChip.className = "category-chip" + (activeSubcategoryFilter === null ? " active" : "");
+    allChip.textContent = "All";
+    allChip.addEventListener("click", function(){
+      activeSubcategoryFilter = null;
+      renderSubcategoryChips();
+      renderMenuPicker();
+    });
+    makeKeyboardClickable(allChip);
+    wrap.appendChild(allChip);
+    subcats.forEach(function(s){
+      var chip = document.createElement("span");
+      chip.className = "category-chip" + (activeSubcategoryFilter === s.id ? " active" : "");
+      chip.textContent = s.name;
+      chip.addEventListener("click", function(){
+        activeSubcategoryFilter = s.id;
+        renderSubcategoryChips();
+        renderMenuPicker();
+      });
+      makeKeyboardClickable(chip);
       wrap.appendChild(chip);
     });
   }
@@ -1882,9 +2528,11 @@
     list.innerHTML = "";
     var items = data.menuItems.filter(function(i){
       var matchesCat = activeCategoryFilter === null || i.categoryId === activeCategoryFilter;
+      var matchesSubcat = activeSubcategoryFilter === null || i.subcategoryId === activeSubcategoryFilter;
       var matchesQuery = !query || i.name.toLowerCase().indexOf(query) !== -1;
-      return matchesCat && matchesQuery;
+      return matchesCat && matchesSubcat && matchesQuery;
     });
+    items = sortMenuItemsBy(items, billingItemSortMode);
     if(items.length === 0){
       list.innerHTML = '<div class="empty-state">No matching items. Add items in Menu &amp; Rates tab.</div>';
       return;
@@ -1913,10 +2561,14 @@
         });
         row.appendChild(variantWrap);
       } else {
-        row.innerHTML = '<div><div class="item-name">' + escapeHtml(item.name) + '</div><div class="item-cat">' + fmt(item.price) + '</div></div>';
+        row.style.flexDirection = "column";
+        row.style.alignItems = "stretch";
+        row.innerHTML = '<div class="item-name">' + escapeHtml(item.name) + '</div><div class="item-cat">' + fmt(item.price) + '</div>';
         var addBtn = document.createElement("button");
         addBtn.className = "btn small";
         addBtn.textContent = "+ Add";
+        addBtn.style.marginTop = "6px";
+        addBtn.style.alignSelf = "flex-start";
         addBtn.addEventListener("click", function(){
           addToCart(item);
         });
@@ -1936,18 +2588,23 @@
     var effectiveTax = (item.taxPercent !== undefined && item.taxPercent !== null) ? item.taxPercent : (data.business.taxPercent || 0);
     var cat = data.categories.find(function(c){ return c.id === item.categoryId; });
     var categoryName = cat ? cat.name : "Uncategorized";
+    var subcat = item.subcategoryId ? data.subcategories.find(function(s){ return s.id === item.subcategoryId; }) : null;
+    var subcategoryName = subcat ? subcat.name : "";
     if(existing){
       existing.qty += 1;
     } else {
-      order.items.push({key: key, itemId: item.id, variantId: variant ? variant.id : null, name: name, price: price, qty: 1, taxPercent: effectiveTax, categoryName: categoryName});
+      order.items.push({key: key, itemId: item.id, variantId: variant ? variant.id : null, name: name, price: price, qty: 1, taxPercent: effectiveTax, categoryName: categoryName, subcategoryName: subcategoryName});
     }
     saveData();
     renderCart();
     renderOrderTabs();
+    showToast("Added: " + name);
   }
 
   function renderCart(){
     var order = getActiveOrder();
+    var tableLabel = document.getElementById("currentBillTableLabel");
+    tableLabel.textContent = order.table ? ("Table / Room: " + order.table) : "";
     var list = document.getElementById("cartList");
     list.innerHTML = "";
     if(order.items.length === 0){
@@ -1964,8 +2621,12 @@
         var minusBtn = document.createElement("button");
         minusBtn.textContent = "−";
         minusBtn.addEventListener("click", function(){
-          c.qty -= 1;
-          if(c.qty <= 0) order.items.splice(idx, 1);
+          if(c.qty - 1 <= 0){
+            order.items.splice(idx, 1);
+            if(order.kotSent) delete order.kotSent[c.key];
+          } else {
+            c.qty -= 1;
+          }
           saveData();
           renderCart();
           renderOrderTabs();
@@ -1991,6 +2652,7 @@
         removeBtn.style.marginLeft = "6px";
         removeBtn.addEventListener("click", function(){
           order.items.splice(idx, 1);
+          if(order.kotSent) delete order.kotSent[c.key];
           saveData();
           renderCart();
           renderOrderTabs();
@@ -2035,19 +2697,26 @@
     document.getElementById("discountValue").value = order.discountValue || 0;
     document.getElementById("discountType").value = order.discountType || "amount";
     document.getElementById("paymentMode").value = order.paymentMode || "Cash";
+    renderSplitPaymentUI(order);
     renderOrderTabs();
     renderCategoryChips();
+    renderSubcategoryChips();
     renderMenuPicker();
     renderCart();
   }
 
   document.getElementById("itemSearch").addEventListener("input", renderMenuPicker);
+  document.getElementById("billingSortMode").addEventListener("change", function(){
+    billingItemSortMode = this.value;
+    renderMenuPicker();
+  });
 
   document.getElementById("billTable").addEventListener("input", function(){
     var order = getActiveOrder();
     order.table = this.value;
     saveData();
     renderOrderTabs();
+    document.getElementById("currentBillTableLabel").textContent = order.table ? ("Table / Room: " + order.table) : "";
   });
 
   document.getElementById("billCustomer").addEventListener("input", function(){
@@ -2084,12 +2753,63 @@
     saveData();
   });
 
+  // Split payment -- lets one order be paid partly in one mode and partly in
+  // another (e.g. part cash, part card). Kept per-order like table/customer.
+  function renderSplitPaymentUI(order){
+    var enabled = !!order.splitEnabled;
+    document.getElementById("splitPaymentToggle").checked = enabled;
+    document.getElementById("splitPaymentRows").style.display = enabled ? "block" : "none";
+    document.getElementById("paymentModeWrap").style.display = enabled ? "none" : "";
+    var parts = order.splitPayments || [{mode:"Cash", amount:0}, {mode:"Card", amount:0}];
+    document.getElementById("splitMode1").value = parts[0].mode || "Cash";
+    document.getElementById("splitAmount1").value = parts[0].amount || 0;
+    document.getElementById("splitMode2").value = parts[1].mode || "Card";
+    document.getElementById("splitAmount2").value = parts[1].amount || 0;
+  }
+
+  function ensureSplitPayments(order){
+    if(!order.splitPayments){
+      order.splitPayments = [{mode:"Cash", amount:0}, {mode:"Card", amount:0}];
+    }
+    return order.splitPayments;
+  }
+
+  document.getElementById("splitPaymentToggle").addEventListener("change", function(){
+    var order = getActiveOrder();
+    order.splitEnabled = this.checked;
+    if(this.checked) ensureSplitPayments(order);
+    saveData();
+    renderSplitPaymentUI(order);
+  });
+
+  document.getElementById("splitMode1").addEventListener("change", function(){
+    var order = getActiveOrder();
+    ensureSplitPayments(order)[0].mode = this.value;
+    saveData();
+  });
+  document.getElementById("splitMode2").addEventListener("change", function(){
+    var order = getActiveOrder();
+    ensureSplitPayments(order)[1].mode = this.value;
+    saveData();
+  });
+  document.getElementById("splitAmount1").addEventListener("input", function(){
+    var order = getActiveOrder();
+    ensureSplitPayments(order)[0].amount = parseFloat(this.value) || 0;
+    saveData();
+  });
+  document.getElementById("splitAmount2").addEventListener("input", function(){
+    var order = getActiveOrder();
+    ensureSplitPayments(order)[1].amount = parseFloat(this.value) || 0;
+    saveData();
+  });
+
   document.getElementById("btnClearBill").addEventListener("click", function(){
     var order = getActiveOrder();
     if(order.items.length === 0) return;
     if(confirm("Clear all items from this order? The table/customer name will be kept.")){
       order.items = [];
       order.discountValue = 0;
+      order.kotSent = {};
       saveData();
       document.getElementById("discountValue").value = 0;
       renderCart();
@@ -2104,7 +2824,18 @@
       return;
     }
     var t = computeTotalsForOrder(order);
-    var itemsSnapshot = order.items.map(function(c){ return {name: c.name, price: c.price, qty: c.qty, taxPercent: c.taxPercent, categoryName: c.categoryName}; });
+    var itemsSnapshot = order.items.map(function(c){ return {name: c.name, price: c.price, qty: c.qty, taxPercent: c.taxPercent, categoryName: c.categoryName, subcategoryName: c.subcategoryName || ""}; });
+
+    // If split payment is on, the two amounts must add up to the bill total
+    // (within a small rounding tolerance) before we let the bill be saved.
+    if(order.splitEnabled){
+      var parts = ensureSplitPayments(order);
+      var splitSum = (parts[0].amount || 0) + (parts[1].amount || 0);
+      if(Math.abs(splitSum - t.total) > 0.01){
+        showToast("Split amounts (" + fmt(splitSum) + ") don't match the bill total (" + fmt(t.total) + ")");
+        return;
+      }
+    }
 
     // Editing an existing bill (opened via "Edit" in Bill History) updates
     // that same bill record in place -- same bill number, same original
@@ -2115,7 +2846,8 @@
         existingBill.table = order.table;
         existingBill.customer = order.customer;
         existingBill.customerPhone = order.customerPhone;
-        existingBill.paymentMode = order.paymentMode || "Cash";
+        existingBill.paymentMode = order.splitEnabled ? "Split" : (order.paymentMode || "Cash");
+        existingBill.splitPayments = order.splitEnabled ? ensureSplitPayments(order).slice() : null;
         existingBill.items = itemsSnapshot;
         existingBill.subtotal = t.subtotal;
         existingBill.discountAmount = t.discountAmount;
@@ -2154,7 +2886,8 @@
       table: order.table,
       customer: order.customer,
       customerPhone: order.customerPhone,
-      paymentMode: order.paymentMode || "Cash",
+      paymentMode: order.splitEnabled ? "Split" : (order.paymentMode || "Cash"),
+      splitPayments: order.splitEnabled ? ensureSplitPayments(order).slice() : null,
       items: itemsSnapshot,
       subtotal: t.subtotal,
       discountAmount: t.discountAmount,
@@ -2171,6 +2904,9 @@
     };
     data.bills.push(bill);
     data.business.dailySeq += 1;
+    // Deduct stock only when a bill is first created -- editing an existing
+    // bill later doesn't re-adjust stock, to avoid double-counting.
+    deductStockForSale(order.items);
 
     var finishedOrderId = order.id;
     saveData();
@@ -2212,7 +2948,8 @@
       var matchesQuery = !query ||
         (b.billNo && b.billNo.toLowerCase().indexOf(query) !== -1) ||
         (b.table && b.table.toLowerCase().indexOf(query) !== -1) ||
-        (b.customer && b.customer.toLowerCase().indexOf(query) !== -1);
+        (b.customer && b.customer.toLowerCase().indexOf(query) !== -1) ||
+        (b.customerPhone && b.customerPhone.toLowerCase().indexOf(query) !== -1);
       var matchesDate = !dateFilter || dateKey(b.date) === dateFilter;
       return matchesQuery && matchesDate;
     });
@@ -2234,12 +2971,16 @@
       groupMap[key].bills.push(b);
       groupMap[key].total += (Number(b.total) || 0);
       if(!groupMap[key].paymentTotals) groupMap[key].paymentTotals = {};
-      var mode = b.paymentMode || "Unspecified";
-      groupMap[key].paymentTotals[mode] = (groupMap[key].paymentTotals[mode] || 0) + (Number(b.total) || 0);
+      if(b.splitPayments && b.splitPayments.length){
+        b.splitPayments.forEach(function(p){
+          var pMode = p.mode || "Unspecified";
+          groupMap[key].paymentTotals[pMode] = (groupMap[key].paymentTotals[pMode] || 0) + (Number(p.amount) || 0);
+        });
+      } else {
+        var mode = b.paymentMode || "Unspecified";
+        groupMap[key].paymentTotals[mode] = (groupMap[key].paymentTotals[mode] || 0) + (Number(b.total) || 0);
+      }
     });
-
-    var grandTotal = 0;
-    var grandCount = 0;
 
     groups.forEach(function(g, gIdx){
       var header = document.createElement("div");
@@ -2314,22 +3055,16 @@
         dayTotalHtml += '<div class="line"><span>' + escapeHtml(mode) + '</span><span>' + fmt(g.paymentTotals[mode]) + '</span></div>';
       });
       dayTotalBox.innerHTML = dayTotalHtml;
+      var printDayBtn = document.createElement("button");
+      printDayBtn.className = "btn small secondary";
+      printDayBtn.textContent = "Print Day Closing";
+      printDayBtn.style.marginTop = "8px";
+      printDayBtn.addEventListener("click", function(){
+        showClosingReport("Day Closing Report", formatDateHeader(g.key), g.bills, g.paymentTotals);
+      });
+      dayTotalBox.appendChild(printDayBtn);
       list.appendChild(dayTotalBox);
-
-      grandTotal += g.total;
-      grandCount += g.bills.length;
     });
-
-    // overall closing total across everything currently shown
-    var grandBox = document.createElement("div");
-    grandBox.className = "totals-box";
-    grandBox.style.marginTop = "18px";
-    grandBox.style.background = "var(--grand-total-bg)";
-    grandBox.style.border = "1px solid var(--primary)";
-    var grandLabel = groups.length === 1 ? "Day Closing Total" : "Grand Total (" + groups.length + " days shown)";
-    var grandBillWord = grandCount === 1 ? "bill" : "bills";
-    grandBox.innerHTML = '<div class="line grand"><span>' + grandLabel + ' — ' + grandCount + ' ' + grandBillWord + '</span><span>' + fmt(grandTotal) + '</span></div>';
-    list.appendChild(grandBox);
   }
 
   // Reopens a saved bill as an editable "table" on the Billing screen. It's
@@ -2352,7 +3087,8 @@
           price: it.price,
           qty: it.qty,
           taxPercent: it.taxPercent,
-          categoryName: it.categoryName
+          categoryName: it.categoryName,
+          subcategoryName: it.subcategoryName || ""
         };
       }),
       discountValue: (bill.discountValue !== undefined ? bill.discountValue : bill.discountAmount) || 0,
@@ -2414,10 +3150,121 @@
     setDashRange("", "");
   });
 
+  document.getElementById("dashBestSellerSort").addEventListener("change", renderDashboard);
+
   document.getElementById("dashFromDate").addEventListener("change", renderDashboard);
   document.getElementById("dashToDate").addEventListener("change", renderDashboard);
 
+  document.getElementById("btnPrintStockReport").addEventListener("click", function(){
+    showStockReport();
+  });
+
+  document.getElementById("btnExportDashboardCsv").addEventListener("click", function(){
+    var fromVal = document.getElementById("dashFromDate").value;
+    var toVal = document.getElementById("dashToDate").value;
+    var bills = data.bills.filter(function(b){
+      var key = dateKey(b.date);
+      if(fromVal && key < fromVal) return false;
+      if(toVal && key > toVal) return false;
+      return true;
+    });
+
+    function csvField(v){
+      var s = String(v);
+      if(s.indexOf(",") !== -1 || s.indexOf('"') !== -1 || s.indexOf("\n") !== -1){
+        s = '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }
+    function csvRow(cells){
+      return cells.map(csvField).join(",") + "\r\n";
+    }
+
+    var totalSales = bills.reduce(function(s, b){ return s + (b.total || 0); }, 0);
+    var totalBills = bills.length;
+    var avgBill = totalBills ? totalSales / totalBills : 0;
+    var totalUnits = bills.reduce(function(s, b){
+      return s + (b.items || []).reduce(function(is, item){ return is + (item.qty || 0); }, 0);
+    }, 0);
+    var avgItemsPerBill = totalBills ? (totalUnits / totalBills) : 0;
+    var totalDiscount = bills.reduce(function(s, b){ return s + (b.discountAmount || 0); }, 0);
+
+    var csv = "";
+    csv += csvRow(["Dashboard Export", "From: " + (fromVal || "All Time"), "To: " + (toVal || "All Time")]);
+    csv += "\r\n";
+
+    csv += csvRow(["Summary"]);
+    csv += csvRow(["Bills", totalBills]);
+    csv += csvRow(["Average Bill", avgBill.toFixed(2)]);
+    csv += csvRow(["Total Units Sold", totalUnits]);
+    csv += csvRow(["Average Items per Bill", avgItemsPerBill.toFixed(2)]);
+    csv += csvRow(["Discounts Given", totalDiscount.toFixed(2)]);
+    csv += csvRow(["Total Sales", totalSales.toFixed(2)]);
+    csv += "\r\n";
+
+    var catTotals = {};
+    bills.forEach(function(b){
+      (b.items || []).forEach(function(item){
+        var cat = item.categoryName || "Uncategorized";
+        if(!catTotals[cat]) catTotals[cat] = {qty: 0, revenue: 0};
+        catTotals[cat].qty += item.qty;
+        catTotals[cat].revenue += item.price * item.qty;
+      });
+    });
+    var catKeys = Object.keys(catTotals).sort(function(a, b){ return catTotals[b].revenue - catTotals[a].revenue; });
+    csv += csvRow(["Sales by Category"]);
+    csv += csvRow(["Category", "Qty", "Revenue"]);
+    catKeys.forEach(function(cat){
+      csv += csvRow([cat, catTotals[cat].qty, catTotals[cat].revenue.toFixed(2)]);
+    });
+    csv += "\r\n";
+
+    var itemTotals = {};
+    bills.forEach(function(b){
+      (b.items || []).forEach(function(item){
+        if(!itemTotals[item.name]) itemTotals[item.name] = {qty: 0, revenue: 0};
+        itemTotals[item.name].qty += item.qty;
+        itemTotals[item.name].revenue += item.price * item.qty;
+      });
+    });
+    var itemNames = Object.keys(itemTotals).sort(function(a, b){ return itemTotals[b].revenue - itemTotals[a].revenue; });
+    csv += csvRow(["Best-Selling Items"]);
+    csv += csvRow(["Item", "Qty Sold", "Revenue"]);
+    itemNames.forEach(function(name){
+      csv += csvRow([name, itemTotals[name].qty, itemTotals[name].revenue.toFixed(2)]);
+    });
+
+    var blob = new Blob([csv], {type: "text/csv"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "dashboard-summary-" + new Date().toISOString().slice(0,10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Always reflects the live/current stock balance -- not affected by the
+  // date range picked above, since stock is a running total, not a
+  // per-day figure.
+  function renderLowStockAlert(){
+    var lowItems = data.menuItems.filter(function(m){ return isLowStock(m); });
+    if(lowItems.length === 0){
+      document.getElementById("dashLowStockBox").innerHTML = '<div class="empty-state">No low-stock items. Turn on "Stock" tracking per item in Menu &amp; Rates to monitor it here.</div>';
+      return;
+    }
+    lowItems.sort(function(a, b){ return (a.stockQty || 0) - (b.stockQty || 0); });
+    var html = '<table><thead><tr><th>Item</th><th style="text-align:right;">Stock Left</th></tr></thead><tbody>';
+    lowItems.forEach(function(m){
+      var qty = m.stockQty || 0;
+      html += '<tr><td>' + escapeHtml(m.name) + '</td><td style="text-align:right; color:var(--danger); font-weight:600;">' + formatStockQty(qty) + ' ' + stockUnitLabel(m) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById("dashLowStockBox").innerHTML = html;
+  }
+
   function renderDashboard(){
+    renderLowStockAlert();
+
     var fromVal = document.getElementById("dashFromDate").value;
     var toVal = document.getElementById("dashToDate").value;
 
@@ -2432,18 +3279,37 @@
     var totalSales = bills.reduce(function(s, b){ return s + (b.total || 0); }, 0);
     var totalBills = bills.length;
     var avgBill = totalBills ? totalSales / totalBills : 0;
+    var totalUnits = bills.reduce(function(s, b){
+      return s + (b.items || []).reduce(function(is, item){ return is + (item.qty || 0); }, 0);
+    }, 0);
+    var avgItemsPerBill = totalBills ? (totalUnits / totalBills) : 0;
+    var totalDiscount = bills.reduce(function(s, b){ return s + (b.discountAmount || 0); }, 0);
+    var billsWithDiscount = bills.filter(function(b){ return (b.discountAmount || 0) > 0; }).length;
     document.getElementById("dashSummaryBox").innerHTML =
       '<div class="totals-box">' +
         '<div class="line"><span>Bills</span><span>' + totalBills + '</span></div>' +
         '<div class="line"><span>Average Bill</span><span>' + fmt(avgBill) + '</span></div>' +
+        '<div class="line"><span>Total Units Sold</span><span>' + totalUnits + '</span></div>' +
+        '<div class="line"><span>Average Items per Bill</span><span>' + avgItemsPerBill.toFixed(1) + '</span></div>' +
+        '<div class="line"><span>Discounts Given (' + billsWithDiscount + ' bills)</span><span>' + fmt(totalDiscount) + '</span></div>' +
         '<div class="line grand"><span>Total Sales</span><span>' + fmt(totalSales) + '</span></div>' +
       '</div>';
 
-    // Payment mode breakdown (for cash reconciliation)
+    // Payment mode breakdown (for cash reconciliation). A split-payment bill
+    // contributes each of its parts to that part's own mode, instead of
+    // lumping the whole bill under a single "Split" bucket, so cash drawer
+    // reconciliation still comes out accurate.
     var paymentTotals = {};
     bills.forEach(function(b){
-      var mode = b.paymentMode || "Unspecified";
-      paymentTotals[mode] = (paymentTotals[mode] || 0) + (b.total || 0);
+      if(b.splitPayments && b.splitPayments.length){
+        b.splitPayments.forEach(function(p){
+          var mode = p.mode || "Unspecified";
+          paymentTotals[mode] = (paymentTotals[mode] || 0) + (p.amount || 0);
+        });
+      } else {
+        var mode = b.paymentMode || "Unspecified";
+        paymentTotals[mode] = (paymentTotals[mode] || 0) + (b.total || 0);
+      }
     });
     var payKeys = Object.keys(paymentTotals);
     if(payKeys.length === 0){
@@ -2483,25 +3349,92 @@
       document.getElementById("dashTaxBox").innerHTML = taxHtml;
     }
 
-    // Revenue by category
+    // Sales by category -- units, revenue, and share of total revenue, so an
+    // owner can see not just what earns the most but how much of the menu
+    // mix each category represents.
     var catTotals = {};
     bills.forEach(function(b){
       (b.items || []).forEach(function(item){
         var cat = item.categoryName || "Uncategorized";
-        catTotals[cat] = (catTotals[cat] || 0) + (item.price * item.qty);
+        if(!catTotals[cat]) catTotals[cat] = {qty: 0, revenue: 0};
+        catTotals[cat].qty += item.qty;
+        catTotals[cat].revenue += item.price * item.qty;
       });
     });
     var catKeys = Object.keys(catTotals);
     if(catKeys.length === 0){
       document.getElementById("dashCategoryBox").innerHTML = '<div class="empty-state">No sales in this range.</div>';
     } else {
-      catKeys.sort(function(a, b){ return catTotals[b] - catTotals[a]; });
-      var catHtml = '<table><thead><tr><th>Category</th><th style="text-align:right;">Revenue</th></tr></thead><tbody>';
+      catKeys.sort(function(a, b){ return catTotals[b].revenue - catTotals[a].revenue; });
+      var catRevenueSum = catKeys.reduce(function(s, k){ return s + catTotals[k].revenue; }, 0);
+      var catHtml = '<table><thead><tr><th>Category</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Revenue</th><th style="text-align:right;">% of Sales</th></tr></thead><tbody>';
       catKeys.forEach(function(cat){
-        catHtml += '<tr><td>' + escapeHtml(cat) + '</td><td style="text-align:right;">' + fmt(catTotals[cat]) + '</td></tr>';
+        var pct = catRevenueSum ? (catTotals[cat].revenue / catRevenueSum * 100) : 0;
+        catHtml += '<tr><td>' + escapeHtml(cat) + '</td><td style="text-align:center;">' + catTotals[cat].qty + '</td><td style="text-align:right;">' + fmt(catTotals[cat].revenue) + '</td><td style="text-align:right;">' + pct.toFixed(1) + '%</td></tr>';
       });
       catHtml += '</tbody></table>';
       document.getElementById("dashCategoryBox").innerHTML = catHtml;
+    }
+
+    // Item-wise units sold, grouped by category -- for the range picked
+    // above (not locked to today), so the owner can check any day/week and
+    // know exactly how many of each item to stock or prep.
+    var catItemUnits = {};
+    bills.forEach(function(b){
+      (b.items || []).forEach(function(item){
+        var cat = item.categoryName || "Uncategorized";
+        if(!catItemUnits[cat]) catItemUnits[cat] = {};
+        catItemUnits[cat][item.name] = (catItemUnits[cat][item.name] || 0) + item.qty;
+      });
+    });
+    var catItemKeys = Object.keys(catItemUnits);
+    if(catItemKeys.length === 0){
+      document.getElementById("dashCategoryItemUnitsBox").innerHTML = '<div class="empty-state">No sales in this range.</div>';
+    } else {
+      catItemKeys.sort(function(a, b){
+        var totalA = Object.keys(catItemUnits[a]).reduce(function(s, n){ return s + catItemUnits[a][n]; }, 0);
+        var totalB = Object.keys(catItemUnits[b]).reduce(function(s, n){ return s + catItemUnits[b][n]; }, 0);
+        return totalB - totalA;
+      });
+      var catItemHtml = "";
+      catItemKeys.forEach(function(cat){
+        var items = catItemUnits[cat];
+        var itemNamesInCat = Object.keys(items).sort(function(a, b){ return items[b] - items[a]; });
+        var catTotalUnits = itemNamesInCat.reduce(function(s, n){ return s + items[n]; }, 0);
+        catItemHtml += '<div style="margin-bottom:14px;">';
+        catItemHtml += '<div style="font-weight:600; margin-bottom:4px;">' + escapeHtml(cat) + ' -- ' + catTotalUnits + ' units</div>';
+        catItemHtml += '<table><thead><tr><th>Item</th><th style="text-align:right;">Units Sold</th></tr></thead><tbody>';
+        itemNamesInCat.forEach(function(name){
+          catItemHtml += '<tr><td>' + escapeHtml(name) + '</td><td style="text-align:right;">' + items[name] + '</td></tr>';
+        });
+        catItemHtml += '</tbody></table></div>';
+      });
+      document.getElementById("dashCategoryItemUnitsBox").innerHTML = catItemHtml;
+    }
+
+    // Sales by subcategory -- only meaningful for bills saved after
+    // subcategory tracking was added to cart lines; older historical bills
+    // simply fall into "No Subcategory" here.
+    var subcatTotals = {};
+    bills.forEach(function(b){
+      (b.items || []).forEach(function(item){
+        var sub = item.subcategoryName || "No Subcategory";
+        if(!subcatTotals[sub]) subcatTotals[sub] = {qty: 0, revenue: 0};
+        subcatTotals[sub].qty += item.qty;
+        subcatTotals[sub].revenue += item.price * item.qty;
+      });
+    });
+    var subcatKeys = Object.keys(subcatTotals);
+    if(subcatKeys.length === 0){
+      document.getElementById("dashSubcategoryBox").innerHTML = '<div class="empty-state">No sales in this range.</div>';
+    } else {
+      subcatKeys.sort(function(a, b){ return subcatTotals[b].revenue - subcatTotals[a].revenue; });
+      var subcatHtml = '<table><thead><tr><th>Subcategory</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Revenue</th></tr></thead><tbody>';
+      subcatKeys.forEach(function(sub){
+        subcatHtml += '<tr><td>' + escapeHtml(sub) + '</td><td style="text-align:center;">' + subcatTotals[sub].qty + '</td><td style="text-align:right;">' + fmt(subcatTotals[sub].revenue) + '</td></tr>';
+      });
+      subcatHtml += '</tbody></table>';
+      document.getElementById("dashSubcategoryBox").innerHTML = subcatHtml;
     }
 
     // Best-selling items
@@ -2513,7 +3446,15 @@
         itemTotals[item.name].revenue += item.price * item.qty;
       });
     });
-    var itemNames = Object.keys(itemTotals).sort(function(a, b){ return itemTotals[b].qty - itemTotals[a].qty; }).slice(0, 10);
+    // Shows every item sold in the range (not just a top-10 cut), sorted by
+    // whichever measure the owner picks -- units moved or revenue earned.
+    var bestSellerSortMode = document.getElementById("dashBestSellerSort").value;
+    var itemNames = Object.keys(itemTotals).sort(function(a, b){
+      if(bestSellerSortMode === "revenue"){
+        return itemTotals[b].revenue - itemTotals[a].revenue;
+      }
+      return itemTotals[b].qty - itemTotals[a].qty;
+    });
     if(itemNames.length === 0){
       document.getElementById("dashBestSellersBox").innerHTML = '<div class="empty-state">No sales in this range.</div>';
     } else {
@@ -2523,6 +3464,49 @@
       });
       bestHtml += '</tbody></table>';
       document.getElementById("dashBestSellersBox").innerHTML = bestHtml;
+    }
+
+    // Peak hours -- which hour of the day (in the browser's local time)
+    // brings in the most business, useful for staffing decisions.
+    var hourTotals = {};
+    bills.forEach(function(b){
+      var h = new Date(b.date).getHours();
+      if(!hourTotals[h]) hourTotals[h] = {count: 0, revenue: 0};
+      hourTotals[h].count += 1;
+      hourTotals[h].revenue += (b.total || 0);
+    });
+    var hourKeys = Object.keys(hourTotals);
+    if(hourKeys.length === 0){
+      document.getElementById("dashHoursBox").innerHTML = '<div class="empty-state">No sales in this range.</div>';
+    } else {
+      hourKeys.sort(function(a, b){ return parseInt(a, 10) - parseInt(b, 10); });
+      var hourHtml = '<table><thead><tr><th>Hour</th><th style="text-align:center;">Bills</th><th style="text-align:right;">Revenue</th></tr></thead><tbody>';
+      hourKeys.forEach(function(h){
+        var hNum = parseInt(h, 10);
+        var label = new Date(2000, 0, 1, hNum).toLocaleTimeString([], {hour:"numeric", hour12:true}) + " – " + new Date(2000, 0, 1, (hNum + 1) % 24).toLocaleTimeString([], {hour:"numeric", hour12:true});
+        hourHtml += '<tr><td>' + label + '</td><td style="text-align:center;">' + hourTotals[h].count + '</td><td style="text-align:right;">' + fmt(hourTotals[h].revenue) + '</td></tr>';
+      });
+      hourHtml += '</tbody></table>';
+      document.getElementById("dashHoursBox").innerHTML = hourHtml;
+    }
+
+    // Day-of-week trends
+    var weekdayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    var weekdayTotals = weekdayNames.map(function(){ return {count: 0, revenue: 0}; });
+    bills.forEach(function(b){
+      var wd = new Date(b.date).getDay();
+      weekdayTotals[wd].count += 1;
+      weekdayTotals[wd].revenue += (b.total || 0);
+    });
+    if(bills.length === 0){
+      document.getElementById("dashWeekdayBox").innerHTML = '<div class="empty-state">No sales in this range.</div>';
+    } else {
+      var weekdayHtml = '<table><thead><tr><th>Day</th><th style="text-align:center;">Bills</th><th style="text-align:right;">Revenue</th></tr></thead><tbody>';
+      weekdayNames.forEach(function(name, idx){
+        weekdayHtml += '<tr><td>' + name + '</td><td style="text-align:center;">' + weekdayTotals[idx].count + '</td><td style="text-align:right;">' + fmt(weekdayTotals[idx].revenue) + '</td></tr>';
+      });
+      weekdayHtml += '</tbody></table>';
+      document.getElementById("dashWeekdayBox").innerHTML = weekdayHtml;
     }
   }
 
@@ -2554,6 +3538,14 @@
     }
     if(bill.serviceChargePercent) lines.push("Service (" + bill.serviceChargePercent + "%): " + bill.currency + bill.service.toFixed(2));
     lines.push("TOTAL: " + bill.currency + bill.total.toFixed(2));
+    if(bill.splitPayments && bill.splitPayments.length){
+      lines.push("Paid via:");
+      bill.splitPayments.forEach(function(p){
+        lines.push("  " + p.mode + ": " + bill.currency + Number(p.amount).toFixed(2));
+      });
+    } else if(bill.paymentMode){
+      lines.push("Paid via: " + bill.paymentMode);
+    }
     if(b.footer) lines.push(b.footer);
     if(LICENSED_TO) lines.push("Licensed to: " + LICENSED_TO);
     return lines.join("\n");
@@ -2618,6 +3610,14 @@
     }
     html += '<hr>';
     html += '<div style="display:flex;justify-content:space-between; font-weight:700; font-size:14px;">TOTAL<span>' + (bill.currency + bill.total.toFixed(2)) + '</span></div>';
+    if(bill.splitPayments && bill.splitPayments.length){
+      html += '<div style="margin-top:4px; font-weight:700;">Paid via:</div>';
+      bill.splitPayments.forEach(function(p){
+        html += '<div style="display:flex;justify-content:space-between;">' + escapeHtml(p.mode) + '<span>' + (bill.currency + Number(p.amount).toFixed(2)) + '</span></div>';
+      });
+    } else if(bill.paymentMode){
+      html += '<div style="display:flex;justify-content:space-between;">Paid via<span>' + escapeHtml(bill.paymentMode) + '</span></div>';
+    }
     html += '<hr>';
     if(b.footer){
       html += '<div class="r-center">' + escapeHtml(b.footer) + '</div>';
@@ -2629,12 +3629,275 @@
     document.getElementById("receiptContent").innerHTML = html;
     document.getElementById("shareWhatsappPhone").value = bill.customerPhone || "";
     updateWhatsappShareLink();
+    // Restore the sharing controls in case a Day Closing Report (which
+    // hides them, since they don't apply to a multi-bill summary) was
+    // shown most recently.
+    document.querySelector(".receipt-share-row").style.display = "";
+    document.getElementById("btnShareWhatsapp").style.display = "";
+    document.getElementById("btnSharePhoto").style.display = canShareReceiptPhoto ? "inline-block" : "none";
+    document.getElementById("btnDownloadPhoto").style.display = "";
     document.getElementById("receipt").style.display = "block";
     document.getElementById("receipt").scrollIntoView({behavior:"smooth"});
   }
 
+  function computeReportTotals(billsForReport){
+    var totals = {subtotal:0, discountAmount:0, tax:0, taxByRate:{}, service:0, grand:0};
+    billsForReport.forEach(function(b){
+      totals.subtotal += Number(b.subtotal) || 0;
+      totals.discountAmount += Number(b.discountAmount) || 0;
+      totals.tax += Number(b.tax) || 0;
+      totals.service += Number(b.service) || 0;
+      totals.grand += Number(b.total) || 0;
+      if(b.taxByRate){
+        Object.keys(b.taxByRate).forEach(function(r){
+          totals.taxByRate[r] = (totals.taxByRate[r] || 0) + (Number(b.taxByRate[r]) || 0);
+        });
+      }
+    });
+    return totals;
+  }
+
+  function computePaymentTotals(billsForReport){
+    var out = {};
+    billsForReport.forEach(function(b){
+      if(b.splitPayments && b.splitPayments.length){
+        b.splitPayments.forEach(function(p){
+          var mode = p.mode || "Unspecified";
+          out[mode] = (out[mode] || 0) + (Number(p.amount) || 0);
+        });
+      } else {
+        var mode = b.paymentMode || "Unspecified";
+        out[mode] = (out[mode] || 0) + (Number(b.total) || 0);
+      }
+    });
+    return out;
+  }
+
+  // A printable summary (not tied to any single bill) for closing out a day
+  // or a shown date range -- reuses the same receipt modal and 58mm print
+  // layout as individual bills, but with sharing controls hidden since
+  // WhatsApp/photo sharing doesn't apply to a multi-bill summary.
+  function showClosingReport(reportTitle, dateLabel, billsForReport, paymentTotalsForReport){
+    currentReceiptBill = null;
+    var b = data.business;
+    var totals = computeReportTotals(billsForReport);
+    var payTotals = paymentTotalsForReport || computePaymentTotals(billsForReport);
+    var html = "";
+    if(b.logo){
+      html += '<img class="r-logo" src="' + b.logo + '">';
+    }
+    html += '<div class="r-center" style="font-weight:700; font-size:15px;">' + escapeHtml(b.name) + '</div>';
+    if(b.address) html += '<div class="r-center">' + escapeHtml(b.address) + '</div>';
+    if(b.phone) html += '<div class="r-center">' + escapeHtml(b.phone) + '</div>';
+    html += '<hr>';
+    html += '<div class="r-center" style="font-weight:700;">' + escapeHtml(reportTitle.toUpperCase()) + '</div>';
+    html += '<div class="r-center">' + escapeHtml(dateLabel) + '</div>';
+    html += '<hr>';
+    // List each individual bill and its amount before the totals, so the
+    // report reads like a proper closing sheet, not just a single number.
+    html += '<table><thead><tr><th>Bill No</th><th style="text-align:right;">Amount</th></tr></thead><tbody>';
+    billsForReport.forEach(function(bill){
+      html += '<tr><td>' + escapeHtml(bill.billNo) + '</td><td style="text-align:right;">' + (b.currency + Number(bill.total).toFixed(2)) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<hr>';
+    var billWord = billsForReport.length === 1 ? "bill" : "bills";
+    html += '<div style="display:flex;justify-content:space-between;">Total Bills<span>' + billsForReport.length + ' ' + billWord + '</span></div>';
+    html += '<div style="display:flex;justify-content:space-between;">Subtotal<span>' + (b.currency + totals.subtotal.toFixed(2)) + '</span></div>';
+    if(totals.discountAmount > 0){
+      html += '<div style="display:flex;justify-content:space-between;">Discounts<span>-' + (b.currency + totals.discountAmount.toFixed(2)) + '</span></div>';
+    }
+    if(Object.keys(totals.taxByRate).length){
+      Object.keys(totals.taxByRate).sort(function(a,c){ return parseFloat(a)-parseFloat(c); }).forEach(function(r){
+        if(totals.taxByRate[r] > 0){
+          html += '<div style="display:flex;justify-content:space-between;">' + escapeHtml(b.taxLabel) + ' (' + r + '%)<span>' + (b.currency + totals.taxByRate[r].toFixed(2)) + '</span></div>';
+        }
+      });
+    } else if(totals.tax > 0){
+      html += '<div style="display:flex;justify-content:space-between;">' + escapeHtml(b.taxLabel) + '<span>' + (b.currency + totals.tax.toFixed(2)) + '</span></div>';
+    }
+    if(totals.service > 0){
+      html += '<div style="display:flex;justify-content:space-between;">Service Charge<span>' + (b.currency + totals.service.toFixed(2)) + '</span></div>';
+    }
+    html += '<hr>';
+    html += '<div style="display:flex;justify-content:space-between; font-weight:700; font-size:14px;">TOTAL<span>' + (b.currency + totals.grand.toFixed(2)) + '</span></div>';
+    html += '<hr>';
+    html += '<div style="font-weight:700; margin-bottom:2px;">Payment Mode Breakdown</div>';
+    Object.keys(payTotals).sort().forEach(function(mode){
+      html += '<div style="display:flex;justify-content:space-between;">' + escapeHtml(mode) + '<span>' + (b.currency + payTotals[mode].toFixed(2)) + '</span></div>';
+    });
+    html += '<hr>';
+    if(LICENSED_TO){
+      html += '<div class="r-center" style="font-size:10px; color:#888; margin-top:6px;">Licensed to: ' + escapeHtml(LICENSED_TO) + '</div>';
+    }
+
+    document.getElementById("receiptContent").innerHTML = html;
+    // Not a single customer's bill, so WhatsApp/photo sharing don't apply --
+    // hide those controls and leave only Print and Close.
+    document.querySelector(".receipt-share-row").style.display = "none";
+    document.getElementById("btnShareWhatsapp").style.display = "none";
+    document.getElementById("btnSharePhoto").style.display = "none";
+    document.getElementById("btnDownloadPhoto").style.display = "none";
+    document.getElementById("receipt").style.display = "block";
+    document.getElementById("receipt").scrollIntoView({behavior:"smooth"});
+  }
+
+  // Stock Report -- a printable snapshot of current stock levels for every
+  // stock-tracked item (liquor/snacks/water/cold drinks), for staff to do a
+  // physical count against at closing time. Reflects the live running
+  // balance right now, not a historical per-day figure, since stock isn't
+  // tracked date-by-date -- only as a running total.
+  function showStockReport(){
+    currentReceiptBill = null;
+    var b = data.business;
+    var trackedItems = data.menuItems.filter(function(m){ return m.trackStock; });
+    var html = "";
+    if(b.logo){
+      html += '<img class="r-logo" src="' + b.logo + '">';
+    }
+    html += '<div class="r-center" style="font-weight:700; font-size:15px;">' + escapeHtml(b.name) + '</div>';
+    html += '<hr>';
+    html += '<div class="r-center" style="font-weight:700;">STOCK REPORT</div>';
+    html += '<div class="r-center">' + new Date().toLocaleString() + '</div>';
+    html += '<hr>';
+    if(trackedItems.length === 0){
+      html += '<div>No items are being stock-tracked yet. Turn on "Stock" for liquor, snacks, water, or cold drink items in Menu &amp; Rates.</div>';
+    } else {
+      trackedItems.sort(function(a, b2){ return a.name.localeCompare(b2.name); });
+      html += '<table><thead><tr><th>Item</th><th style="text-align:right;">System Stock</th><th style="text-align:right;">Physical Count</th></tr></thead><tbody>';
+      trackedItems.forEach(function(item){
+        var qty = item.stockQty || 0;
+        var qtyLabel = formatStockQty(qty) + ' ' + stockUnitLabel(item);
+        html += '<tr><td>' + escapeHtml(item.name) + '</td><td style="text-align:right;">' + escapeHtml(qtyLabel) + '</td><td style="text-align:right;">______</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '<hr>';
+    html += '<div class="muted" style="font-size:11px;">Fill in "Physical Count" by hand and compare against System Stock to catch shortages.</div>';
+    if(LICENSED_TO){
+      html += '<div class="r-center" style="font-size:10px; color:#888; margin-top:6px;">Licensed to: ' + escapeHtml(LICENSED_TO) + '</div>';
+    }
+
+    document.getElementById("receiptContent").innerHTML = html;
+    document.querySelector(".receipt-share-row").style.display = "none";
+    document.getElementById("btnShareWhatsapp").style.display = "none";
+    document.getElementById("btnSharePhoto").style.display = "none";
+    document.getElementById("btnDownloadPhoto").style.display = "none";
+    document.getElementById("receipt").style.display = "block";
+    document.getElementById("receipt").scrollIntoView({behavior:"smooth"});
+  }
+
+  // Kitchen Order Ticket -- a no-price ticket for the kitchen/bar counter,
+  // reusing the same printable modal and 58mm print CSS as the customer
+  // receipt, but showing only item names/quantities so kitchen staff aren't
+  // shown prices or totals.
+  //
+  // Tracks what's already been sent to the kitchen (order.kotSent, a map of
+  // cart-line-key -> quantity already printed) so that if the table orders
+  // again after the first ticket, only the newly added items/quantities get
+  // printed -- not the whole order again -- and the ticket is clearly marked
+  // as an ADD-ON so kitchen staff don't treat it as a duplicate.
+  function showKOT(order, ticketItems, isAddOn){
+    currentReceiptBill = null;
+    var html = '<div class="r-center" style="font-weight:700; font-size:15px;">KITCHEN ORDER TICKET' + (isAddOn ? " — ADD-ON" : "") + '</div>';
+    html += '<div class="r-center">' + new Date().toLocaleString() + '</div>';
+    html += '<hr>';
+    if(order.table) html += '<div>Table/Room: ' + escapeHtml(order.table) + '</div>';
+    if(order.customer) html += '<div>Customer: ' + escapeHtml(order.customer) + '</div>';
+    html += '<hr>';
+    html += '<table><thead><tr><th>Item</th><th style="text-align:center;">Qty</th></tr></thead><tbody>';
+    ticketItems.forEach(function(item){
+      html += '<tr><td>' + escapeHtml(item.name) + '</td><td style="text-align:center; font-weight:700;">' + item.qty + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<hr>';
+
+    document.getElementById("receiptContent").innerHTML = html;
+    document.querySelector(".receipt-share-row").style.display = "none";
+    document.getElementById("btnShareWhatsapp").style.display = "none";
+    document.getElementById("btnSharePhoto").style.display = "none";
+    document.getElementById("btnDownloadPhoto").style.display = "none";
+    document.getElementById("receipt").style.display = "block";
+    document.getElementById("receipt").scrollIntoView({behavior:"smooth"});
+  }
+
+  // Whether a category sends its items to the kitchen by default. Every
+  // category defaults to "on" unless the owner has explicitly switched it
+  // off (e.g. a whole "Drinks" category in a bar).
+  function categorySendsToKitchen(categoryId){
+    var cat = data.categories.find(function(c){ return c.id === categoryId; });
+    return !cat || cat.sendToKitchen !== false;
+  }
+
+  // Whether a specific menu item sends to the kitchen. An item can override
+  // its category ("Always"/"Never"), or leave sendToKitchen unset to just
+  // follow whatever the category is set to.
+  function itemSendsToKitchen(menuItem){
+    if(menuItem.sendToKitchen === true) return true;
+    if(menuItem.sendToKitchen === false) return false;
+    return categorySendsToKitchen(menuItem.categoryId);
+  }
+
+  // Whether a cart line should ever appear on a KOT. Lines with no itemId
+  // (reconstructed from an edited past bill) default to included, since
+  // there's no menu item/category to check.
+  function shouldSendToKitchen(cartItem){
+    if(!cartItem.itemId) return true;
+    var menuItem = data.menuItems.find(function(m){ return m.id === cartItem.itemId; });
+    if(!menuItem) return true;
+    return itemSendsToKitchen(menuItem);
+  }
+
+  document.getElementById("btnPrintKOT").addEventListener("click", function(){
+    var order = getActiveOrder();
+    if(order.items.length === 0){
+      showToast("Add at least one item first");
+      return;
+    }
+    if(!order.kotSent) order.kotSent = {};
+    var isAddOn = Object.keys(order.kotSent).length > 0;
+
+    // Only include items/quantities not already sent to the kitchen, and
+    // skip any item marked "don't send to kitchen" in Menu & Rates. If an
+    // item's quantity went up since the last ticket (e.g. 2 -> 3), only the
+    // extra 1 is printed. Items that were removed after being sent are just
+    // left off -- there's nothing new to tell the kitchen about them.
+    var ticketItems = [];
+    order.items.forEach(function(c){
+      if(!shouldSendToKitchen(c)) return;
+      var alreadySent = order.kotSent[c.key] || 0;
+      var newQty = c.qty - alreadySent;
+      if(newQty > 0){
+        ticketItems.push({name: c.name, qty: newQty});
+      }
+    });
+
+    if(ticketItems.length === 0){
+      showToast("Nothing new to send to the kitchen since the last KOT");
+      return;
+    }
+
+    showKOT(order, ticketItems, isAddOn);
+    printReceiptNow();
+
+    // Mark everything currently in the order as sent, so the next ticket
+    // only shows whatever gets added after this point.
+    order.items.forEach(function(c){ order.kotSent[c.key] = c.qty; });
+    saveData();
+  });
+
   document.getElementById("btnClosePreview").addEventListener("click", function(){
     document.getElementById("receipt").style.display = "none";
+  });
+
+  // Let staff dismiss the receipt preview with Escape, same as clicking Close.
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape"){
+      var receiptEl = document.getElementById("receipt");
+      if(receiptEl && receiptEl.style.display !== "none"){
+        receiptEl.style.display = "none";
+      }
+    }
   });
 
   /* ---- Receipt as a photo (wa.me links can only carry text, not attachments,
@@ -2745,6 +4008,13 @@
       }
       addDivider();
       addRow(["TOTAL", "", bill.currency + bill.total.toFixed(2)], {bold: true, size: 14});
+      if(bill.splitPayments && bill.splitPayments.length){
+        bill.splitPayments.forEach(function(p){
+          addRow([p.mode, "", bill.currency + Number(p.amount).toFixed(2)], {size: 12});
+        });
+      } else if(bill.paymentMode){
+        addRow(["Paid via", "", bill.paymentMode], {size: 12});
+      }
       addDivider();
       if(b.footer) addText(b.footer, {align: "center", size: 12});
       if(LICENSED_TO) addText("Licensed to: " + LICENSED_TO, {align: "center", size: 9});
