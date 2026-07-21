@@ -820,17 +820,8 @@
     </div>
 
     <div class="card">
-      <div class="flex-between">
-        <h2>Low Stock Alert</h2>
-        <button class="btn small secondary" id="btnPrintStockReport" style="flex:0 0 auto;">Print Stock Report</button>
-      </div>
-      <p class="muted">Live stock levels for liquor, snacks, water, and cold drinks -- turn on "Stock" tracking per item in Menu &amp; Rates.</p>
-      <div id="dashLowStockBox"></div>
-    </div>
-
-    <div class="card">
       <h2>Item-wise Units Sold by Category</h2>
-      <p class="muted">Uses the date range picked above -- every item sold in each category, with units sold, for easy stock/inventory planning.</p>
+      <p class="muted">Uses the date range picked above -- every item sold in each category, with units sold, for easy planning.</p>
       <div id="dashCategoryItemUnitsBox"></div>
     </div>
 
@@ -1013,8 +1004,7 @@
     subcategories: [],
     menuItems: [],
     openOrders: [],
-    bills: [],
-    stockLog: []
+    bills: []
   };
 
   // In-memory copy of all app data. Populated once loadData()'s promise
@@ -1055,7 +1045,6 @@
     parsed.menuItems = parsed.menuItems || [];
     parsed.openOrders = parsed.openOrders || [];
     parsed.bills = parsed.bills || [];
-    parsed.stockLog = parsed.stockLog || [];
     return parsed;
   }
 
@@ -1700,83 +1689,6 @@
 
   function itemKotStatusText(item){
     return itemSendsToKitchen(item) ? "" : "Not sent to kitchen";
-  }
-
-  /* ================= STOCK TRACKING (liquor / snacks / water / cold drinks) =================
-     Deliberately scoped: kitchen dishes are never stock-tracked (recipes vary
-     too much to track sanely in a simple billing app). Owners flip "Stock"
-     on per item for packaged/countable goods only.
-
-     Stock is kept as a simple running balance (item.stockQty), in "bottles"
-     for liquor-type items or "units" for everything else. Liquor is sold by
-     the peg but purchased by the bottle, so item.stockConversion holds how
-     many sold units (pegs) make up one stock count (one bottle) -- e.g. 20.
-     Simple items (snacks/water/cold drinks) keep stockConversion at 1, so
-     one sale = one unit deducted directly, no conversion math needed.
-     This is a rough, practical model (not exact ml-level peg tracking) by
-     design, per the owner's choice to keep it simple. */
-  function toggleItemStock(item){
-    item.trackStock = !item.trackStock;
-    if(item.trackStock){
-      if(item.stockQty === undefined || item.stockQty === null) item.stockQty = 0;
-      if(!item.stockConversion) item.stockConversion = 1;
-      if(item.lowStockThreshold === undefined || item.lowStockThreshold === null) item.lowStockThreshold = 5;
-    }
-  }
-  function stockUnitLabel(item){
-    return (item.stockConversion && item.stockConversion > 1) ? "bottles" : "units";
-  }
-  function formatStockQty(n){
-    var r = Math.round((n || 0) * 100) / 100;
-    return Number.isInteger(r) ? String(r) : r.toFixed(2);
-  }
-  function isLowStock(item){
-    if(!item.trackStock) return false;
-    var qty = item.stockQty || 0;
-    var threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 0;
-    return qty <= threshold;
-  }
-  function promptAddStock(item){
-    var qtyStr = prompt('How much stock to add for "' + item.name + '"? (in ' + stockUnitLabel(item) + ')', "");
-    if(qtyStr === null) return;
-    var q = parseFloat(qtyStr);
-    if(isNaN(q) || q <= 0){ showToast("Enter a valid quantity"); return; }
-    item.stockQty = (item.stockQty || 0) + q;
-    data.stockLog.push({id: uid("stock"), itemId: item.id, itemName: item.name, qtyAdded: q, date: new Date().toISOString()});
-    saveData();
-    renderMenuScreen();
-    showToast("Stock updated: " + item.name);
-  }
-  function promptEditStockSettings(item){
-    var currentQty = prompt('Current stock count for "' + item.name + '" (correct this after a physical count)', formatStockQty(item.stockQty || 0));
-    if(currentQty === null) return;
-    var cq = parseFloat(currentQty);
-    if(isNaN(cq)){ showToast("Invalid stock quantity"); return; }
-    var conv = prompt('Pegs/units per bottle for "' + item.name + '" (leave as 1 if sold as whole units, e.g. snacks/water/cold drinks)', item.stockConversion || 1);
-    if(conv === null) return;
-    var cv = parseFloat(conv);
-    if(isNaN(cv) || cv <= 0){ showToast("Invalid conversion value"); return; }
-    var thresh = prompt('Low stock alert threshold for "' + item.name + '"', item.lowStockThreshold !== undefined ? item.lowStockThreshold : 5);
-    if(thresh === null) return;
-    var th = parseFloat(thresh);
-    if(isNaN(th) || th < 0){ showToast("Invalid threshold"); return; }
-    item.stockQty = cq;
-    item.stockConversion = cv;
-    item.lowStockThreshold = th;
-    saveData();
-    renderMenuScreen();
-    showToast("Stock settings updated");
-  }
-  // Called once when a new bill is created (not on edits, to avoid double-
-  // counting deductions against a bill that was already deducted once).
-  function deductStockForSale(cartItems){
-    (cartItems || []).forEach(function(c){
-      if(!c.itemId) return;
-      var menuItem = data.menuItems.find(function(m){ return m.id === c.itemId; });
-      if(!menuItem || !menuItem.trackStock) return;
-      var conversion = menuItem.stockConversion || 1;
-      menuItem.stockQty = (menuItem.stockQty || 0) - (c.qty / conversion);
-    });
   }
 
   function renderMenuItemRow(list, item){
@@ -2904,9 +2816,6 @@
     };
     data.bills.push(bill);
     data.business.dailySeq += 1;
-    // Deduct stock only when a bill is first created -- editing an existing
-    // bill later doesn't re-adjust stock, to avoid double-counting.
-    deductStockForSale(order.items);
 
     var finishedOrderId = order.id;
     saveData();
@@ -3155,10 +3064,6 @@
   document.getElementById("dashFromDate").addEventListener("change", renderDashboard);
   document.getElementById("dashToDate").addEventListener("change", renderDashboard);
 
-  document.getElementById("btnPrintStockReport").addEventListener("click", function(){
-    showStockReport();
-  });
-
   document.getElementById("btnExportDashboardCsv").addEventListener("click", function(){
     var fromVal = document.getElementById("dashFromDate").value;
     var toVal = document.getElementById("dashToDate").value;
@@ -3243,28 +3148,7 @@
     URL.revokeObjectURL(url);
   });
 
-  // Always reflects the live/current stock balance -- not affected by the
-  // date range picked above, since stock is a running total, not a
-  // per-day figure.
-  function renderLowStockAlert(){
-    var lowItems = data.menuItems.filter(function(m){ return isLowStock(m); });
-    if(lowItems.length === 0){
-      document.getElementById("dashLowStockBox").innerHTML = '<div class="empty-state">No low-stock items. Turn on "Stock" tracking per item in Menu &amp; Rates to monitor it here.</div>';
-      return;
-    }
-    lowItems.sort(function(a, b){ return (a.stockQty || 0) - (b.stockQty || 0); });
-    var html = '<table><thead><tr><th>Item</th><th style="text-align:right;">Stock Left</th></tr></thead><tbody>';
-    lowItems.forEach(function(m){
-      var qty = m.stockQty || 0;
-      html += '<tr><td>' + escapeHtml(m.name) + '</td><td style="text-align:right; color:var(--danger); font-weight:600;">' + formatStockQty(qty) + ' ' + stockUnitLabel(m) + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    document.getElementById("dashLowStockBox").innerHTML = html;
-  }
-
   function renderDashboard(){
-    renderLowStockAlert();
-
     var fromVal = document.getElementById("dashFromDate").value;
     var toVal = document.getElementById("dashToDate").value;
 
@@ -3378,7 +3262,7 @@
 
     // Item-wise units sold, grouped by category -- for the range picked
     // above (not locked to today), so the owner can check any day/week and
-    // know exactly how many of each item to stock or prep.
+    // know exactly how many of each item sold.
     var catItemUnits = {};
     bills.forEach(function(b){
       (b.items || []).forEach(function(item){
@@ -3734,51 +3618,6 @@
     document.getElementById("receiptContent").innerHTML = html;
     // Not a single customer's bill, so WhatsApp/photo sharing don't apply --
     // hide those controls and leave only Print and Close.
-    document.querySelector(".receipt-share-row").style.display = "none";
-    document.getElementById("btnShareWhatsapp").style.display = "none";
-    document.getElementById("btnSharePhoto").style.display = "none";
-    document.getElementById("btnDownloadPhoto").style.display = "none";
-    document.getElementById("receipt").style.display = "block";
-    document.getElementById("receipt").scrollIntoView({behavior:"smooth"});
-  }
-
-  // Stock Report -- a printable snapshot of current stock levels for every
-  // stock-tracked item (liquor/snacks/water/cold drinks), for staff to do a
-  // physical count against at closing time. Reflects the live running
-  // balance right now, not a historical per-day figure, since stock isn't
-  // tracked date-by-date -- only as a running total.
-  function showStockReport(){
-    currentReceiptBill = null;
-    var b = data.business;
-    var trackedItems = data.menuItems.filter(function(m){ return m.trackStock; });
-    var html = "";
-    if(b.logo){
-      html += '<img class="r-logo" src="' + b.logo + '">';
-    }
-    html += '<div class="r-center" style="font-weight:700; font-size:15px;">' + escapeHtml(b.name) + '</div>';
-    html += '<hr>';
-    html += '<div class="r-center" style="font-weight:700;">STOCK REPORT</div>';
-    html += '<div class="r-center">' + new Date().toLocaleString() + '</div>';
-    html += '<hr>';
-    if(trackedItems.length === 0){
-      html += '<div>No items are being stock-tracked yet. Turn on "Stock" for liquor, snacks, water, or cold drink items in Menu &amp; Rates.</div>';
-    } else {
-      trackedItems.sort(function(a, b2){ return a.name.localeCompare(b2.name); });
-      html += '<table><thead><tr><th>Item</th><th style="text-align:right;">System Stock</th><th style="text-align:right;">Physical Count</th></tr></thead><tbody>';
-      trackedItems.forEach(function(item){
-        var qty = item.stockQty || 0;
-        var qtyLabel = formatStockQty(qty) + ' ' + stockUnitLabel(item);
-        html += '<tr><td>' + escapeHtml(item.name) + '</td><td style="text-align:right;">' + escapeHtml(qtyLabel) + '</td><td style="text-align:right;">______</td></tr>';
-      });
-      html += '</tbody></table>';
-    }
-    html += '<hr>';
-    html += '<div class="muted" style="font-size:11px;">Fill in "Physical Count" by hand and compare against System Stock to catch shortages.</div>';
-    if(LICENSED_TO){
-      html += '<div class="r-center" style="font-size:10px; color:#888; margin-top:6px;">Licensed to: ' + escapeHtml(LICENSED_TO) + '</div>';
-    }
-
-    document.getElementById("receiptContent").innerHTML = html;
     document.querySelector(".receipt-share-row").style.display = "none";
     document.getElementById("btnShareWhatsapp").style.display = "none";
     document.getElementById("btnSharePhoto").style.display = "none";
