@@ -975,8 +975,8 @@
      source can still find these values. It stops casual sharing,
      not a determined technical bypass.
      ============================================================ */
-  var APP_ACCESS_PIN = "1717";
-  var LICENSED_TO = "hotel sasarwadi";
+  var APP_ACCESS_PIN = "";
+  var LICENSED_TO = "";
 
   var LOCK_STORAGE_KEY = "billingAppUnlocked_v1";
 
@@ -2886,7 +2886,7 @@
           groupMap[key].paymentTotals[pMode] = (groupMap[key].paymentTotals[pMode] || 0) + (Number(p.amount) || 0);
         });
       } else {
-        var mode = b.paymentMode || "Unspecified";
+        var mode = normalizedPaymentMode(b.paymentMode);
         groupMap[key].paymentTotals[mode] = (groupMap[key].paymentTotals[mode] || 0) + (Number(b.total) || 0);
       }
     });
@@ -3191,7 +3191,7 @@
           paymentTotals[mode] = (paymentTotals[mode] || 0) + (p.amount || 0);
         });
       } else {
-        var mode = b.paymentMode || "Unspecified";
+        var mode = normalizedPaymentMode(b.paymentMode);
         paymentTotals[mode] = (paymentTotals[mode] || 0) + (b.total || 0);
       }
     });
@@ -3541,6 +3541,18 @@
     return totals;
   }
 
+  // A bill's own paymentMode is only ever "Split" as a label for the bill
+  // record itself -- it's never a real payment mode to bucket money under.
+  // Well-formed split bills always carry splitPayments (each part attributed
+  // to its own real mode), so this fallback only fires for old/malformed
+  // records that say "Split" but never recorded the per-mode breakdown --
+  // those get folded into "Unspecified" instead of a meaningless "Split"
+  // bucket, since there's no way to recover which part was cash vs card.
+  function normalizedPaymentMode(mode){
+    if(!mode || mode === "Split") return "Unspecified";
+    return mode;
+  }
+
   function computePaymentTotals(billsForReport){
     var out = {};
     billsForReport.forEach(function(b){
@@ -3550,7 +3562,7 @@
           out[mode] = (out[mode] || 0) + (Number(p.amount) || 0);
         });
       } else {
-        var mode = b.paymentMode || "Unspecified";
+        var mode = normalizedPaymentMode(b.paymentMode);
         out[mode] = (out[mode] || 0) + (Number(b.total) || 0);
       }
     });
